@@ -1,2 +1,2 @@
-# Epi2Tx
-Machine-learning prediction of transcriptomic states from epigenetic features
+# Machine-learning prediction of transcriptomic states from epigenetic features
+
