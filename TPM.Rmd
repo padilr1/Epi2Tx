@@ -1,0 +1,60 @@
+---
+title: "genomics_analysis"
+output: output_format
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rtracklayer)
+library(data.table)
+library(ggplot2)
+library(ggrepel)
+library(ggpubr)
+library(GenomicRanges)
+library(DESeq2)
+library(gprofiler2)
+library(org.Mm.eg.db)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(fgsea)
+library(see)
+library(genekitr)
+library(gprofiler2)
+library(goseq)
+library(rstatix)
+library(limma)
+library(tximport)
+```
+
+# process
+```{r}
+# using salmon
+mm10_SYMBOL_ENTREZ_ENSEMBL <- fread("~/Documents/NSD1_NSD2_comparison/ref/mm10_proteinCodingGenes_ENSEMBL_ENTREZ_SYMBOL.csv")
+# WT_2 is an outlier
+sample_names <- c("WT_1","WT_3","WT_4","NSD1KO_1","NSD1KO_2","NSD1KO_3")
+files <- file.path("~/Documents/Epi2Tx/rawCounts/salmon/mMSC",sample_names,"quant.sf")
+names(files) <- sample_names
+tx2gene <- fread("~/Documents/NSD1_NSD2_comparison/work/RNAseq/stable/NSD1_NSD2_normCountsAcrossCellLines/mm10_tx2gene.csv",header = FALSE)
+
+txi <- tximport(files = files,type = "salmon",tx2gene = tx2gene,countsFromAbundance = "no")
+metadata <- data.frame(kind=sample_names) %>% mutate(cond = gsub("_[0-9]","",.$kind)) %>% column_to_rownames("kind")
+dds <- DESeqDataSetFromTximport(txi,colData = metadata,design = ~cond)
+dds <- DESeq(dds)
+
+keep <- rowSums(counts(dds) >= 5) >= 3
+dds <- dds[keep,]
+
+vst <- varianceStabilizingTransformation(dds)
+
+source("~/Documents/RBiokitx/PCA.R", echo=TRUE)
+
+plotPCA(dds = dds,labelSamps = TRUE,condLabel = "cond")
+
+mMSC_TPMcounts <- tximport(files = files,type = "salmon",tx2gene = tx2gene,countsFromAbundance = "lengthScaledTPM") %>% as.data.frame() %>% .[grepl('abundance', names(.))] %>% rownames_to_column("ensembl_id")
+
+colnames(mMSC_TPMcounts) <- c("ensembl_id","mMSC_WT_1","mMSC_WT_2","mMSC_WT_3","mMSC_NSD1KO_1","mMSC_NSD1KO_2","mMSC_NSD1KO_3")
+
+write_csv(mMSC_TPMcounts,file = "~/Documents/Epi2Tx/normCounts/mMSC_TPMcounts.csv")
+```
+
